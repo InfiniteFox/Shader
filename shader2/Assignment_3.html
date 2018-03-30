@@ -1,0 +1,160 @@
+<script src=lib2.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+</center>
+</body>
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   varying   vec3 vPos;
+   void main() {
+      gl_Position = vec4(aPos, 1.);
+      vPos = aPos;
+   }
+</script>
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+uniform float uTime;
+varying vec3 vPos;
+
+vec3 sph(float x, float y, vec3 center, float radius) {
+    float f = 5.;
+    float r = radius;
+    vec3 C = center;
+    float z;
+    float t;
+    vec3 S;
+    
+    vec3 V = vec3(0.,0.,f);
+    vec3 W = normalize(vec3(x,y,-f));
+    vec3 P = V-C;
+    float root = dot(W,P)*dot(W,P) - dot(P,P) + r*r;
+    
+    if (root < 0.){
+        z = -1.0;
+    }
+    else if(root == 0.) {
+        t = -dot(W,P);
+        S = V + t*W;
+        return normalize(S-C);
+    }
+    else {
+        float root1 = -dot(W,P) + sqrt(root);
+        float root2 = -dot(W,P) - sqrt(root);
+        if (root1 < 0.){
+            t = root2;
+        }
+        else if (root2 < 0.){
+            t = root1;
+        }
+        else {
+            t = root2;
+        }
+        S = V + t*W;
+        return normalize(S-C);
+    }
+    return vec3(x,y,z);
+}
+
+float noise_generater(float factor){
+    if (factor == 0.){
+        return .5;
+    }
+    return noise(vec3(factor,cos(uTime)*factor,sin(uTime)));
+}
+                 
+vec3 PRM(float x, float y, float z, vec3 L, vec3 N){
+    float f = 5.;
+    vec3 W = normalize(vec3(x,y,-f));
+    vec3 E = -W;
+    
+    vec3 R = 2.*dot(L,N) * N - L;
+    vec3 A = vec3(.5,noise_generater(0.5),.2); //Ambient
+    vec3 D = vec3(.5,.5,noise_generater(0.));  //Diffuse
+    vec3 S = vec3(noise_generater(0.2),.2,.3); //Specular
+    
+    vec3 result = A + D*max(0.,dot(L,N))
+    + S*max(0.,dot(E,R)*dot(E,R)*dot(E,R));
+    
+    
+    //mirror
+    vec3 W1 = 2.*dot(W,N)*N -(W);
+    vec3 V1 = vec3(x,y,z) + 0.001*W1;
+    
+    result += V1;
+    
+    return result;
+
+}
+
+
+void main() {
+   vec3 N = sph(2.*vPos.x, 2.*vPos.y, vec3(-0.4,-0.3,-1.2),.6);
+   vec3 N1 = sph(2.*vPos.x, 2.*vPos.y, vec3(.5,.3,.3),.4);
+   vec3 L = vec3(.5*sin(5.*uTime),1.,1.);
+   
+   vec3 c = PRM(vPos.x, vPos.y, vPos.z, L,N);
+   vec3 c1 = PRM(vPos.x, vPos.y, vPos.z, L,N1);
+   
+   vec3 color = vec3(0.,0.,0.);               //black
+
+   if (N.z >=0.){
+       color = c;
+   }
+   if (N1.z >= 0.){
+       color = c1;
+   }
+
+   gl_FragColor = vec4(sqrt(color), 1.0);
+}</script>
+
+<script id='instructions' type='text/html'><font color=#b0b0b0>
+
+</script>
+   
+<script>
+var vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>Phong Shading</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+var i, text = fs.split('\n'), cols = 0;
+for (i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+var startTime = Date.now();
+
+function animate(gl) {
+   let time = (Date.now() - startTime) / 1000;
+   setUniform('1f', 'uTime', time);
+}
+
+gl_start(canvas1, vs, fs);
+</script>
+
