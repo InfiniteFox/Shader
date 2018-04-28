@@ -1,0 +1,682 @@
+<script src=lib4.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+</center>
+</body>
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos; // VERTEX ATTRIBUTES: POSITION
+   attribute vec3 aNor; //                    NORMAL
+   attribute vec2 aUV ; //                    TEXTURE U,V
+
+   uniform mat4 uPPMat;     // PERSPECTIVE PROJECTION MATRIX
+   uniform mat4 uObjectMat; // OBJECT TRANSFORMATION MATRIX
+   uniform mat4 uNormalMat; // NORMAL TRANSFORMATION MATRIX
+
+   varying   vec3 vPos; // TRANSFORMED POSITION
+   varying   vec3 vNor; // TRANSFORMED NORMAL
+   varying   vec2 vUV ;
+
+   void main() {
+      gl_Position = uPPMat * uObjectMat * vec4(aPos, 1.);
+      vPos = aPos;
+      vNor = (vec4(aNor, 0.) * uNormalMat).xyz;
+      vUV  = aUV ;
+   }
+</script>
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+varying vec3  vPos;
+varying vec3  vNor;
+varying vec2  vUV ;
+uniform vec3  uRGB;
+uniform mat4 uMat[2];
+uniform float uTime;
+
+float noise_generater(float factor){
+    if (factor == 0.){
+        return .3;
+    }
+    return noise(vec3(factor,cos(uTime)*factor,sin(uTime)));
+}
+
+void main() {
+   vec3 normal = normalize(vNor);
+   vec3 lDir = normalize(vec3(noise_generater(sin(uTime)),1.,1.));
+   float c = 0.1 + 0.9 * max(0.,
+             dot(normal, lDir));
+   vec3 color = uRGB * c;
+   gl_FragColor = vec4(sqrt(color), 1.0);
+}</script>
+
+<script id='instructions' type='text/html'><font color=#b0b0b0>
+<b>Description</b>
+<p>
+Newell teapot.
+</script>
+   
+<script>
+var vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>Newell Teapot</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+var i, text = fs.split('\n'), cols = 0;
+for (i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+var startTime = Date.now();
+
+// RETURNS ONE VERTEX OF A UNIT SPHERE, GIVEN PARAMETRIC u,v
+
+function sphereVertex(u, v) {
+    let theta = 2 * Math.PI * u;
+    let phi   = Math.PI * (v - .5);
+    let x = Math.cos(phi) * Math.cos(theta);
+    let y = Math.cos(phi) * Math.sin(theta);
+    let z = Math.sin(phi);
+    return [x, y, z,  x, y, z,  u, v];
+}
+
+function CylinderVertex(u, v) {
+  let theta = 2 * Math.PI * u;
+  
+  //POSITION
+  let x1 = 0;
+  let y1 = 0;
+  if (v==.2 || v==.4 || v==.6 || v==.8){
+      x1 = Math.cos(theta);
+      y1 = Math.sin(theta);
+  }
+  
+  let z1 = -1;
+  if (v==.6 || v==.8 || v==1){
+      z1 = 1;
+  }
+  
+  //NORMAL
+  let x2 = 0;
+  let y2 = 0;
+  let z2 = -1;
+  if (v == .4|| v==.6){
+      x2 = Math.cos(theta);
+      y2 = Math.sin(theta);
+      z2 = 0;
+  }
+  if (v ==.8 || v== 1){
+      x2 = 0;
+      y2 = 0;
+      z2 = 1;
+  }
+  
+  
+  return [x1, y1, z1,  x2, y2, z2,  u, v];
+}
+
+function CubeVertex(u, v) {
+    let theta = 2 * Math.PI * u;
+    
+    //POSITION
+    let x1 = 1;
+    let y1 = 1;
+    let z1 = 0;
+    if (u==.25 || u==.375 || u==.5 || u==.625){
+        x1 = -1;
+    }
+    if (u==.5 || u==.625 || u==.75 || u==.875){
+        y1 = -1;
+    }
+    
+    if (v==0 || v==1){
+        x1 = 0;
+        y1 = 0;
+    }
+    
+    if (v==0 || v==.2 || v==.4 ){
+        z1 = -1;
+    }
+    if (v==.6 || v==.8 || v==1){
+        z1 = 1;
+    }
+    
+    
+    //NORMAL
+    let x2 = 1;
+    let y2 = 0;
+    let z2 = 0;
+    if (u==.125 || u==.25){
+        x2 = 0;
+        y2 = 1;
+    }
+    if (u==.375 || u==.5){
+        x2 = -1;
+    }
+    if (u==.625 || u==.75){
+        x2 = 0;
+        y2 = -1;
+    }
+    
+    if (v==0 || v==.2 ){
+        x2 = 0;
+        y2 = 0;
+        z2 = -1;
+    }
+    if (v==.4 || v==.6 ){
+        z2 = 0;
+    }
+    if (v==.8 || v==1 ){
+        x2 = 0;
+        y2 = 0;
+        z2 = 1;
+    }
+    
+    
+    return [x1, y1, z1,  x2, y2, z2,  u, v];
+}
+
+function cross(A, B) {
+    let result = [0,0,0];
+    result[0] = A[1]*B[2]-A[2]*B[1];
+    result[1] = A[2]*B[0]-A[0]*B[2];
+    result[2] = A[0]*B[1]-A[1]*B[0];
+    return result;
+}
+
+function face_normal(N, data){
+    
+}
+
+function vertx_normal(){
+    
+}
+
+function BezierVertex(data, u, v){
+                  
+    let x = [];
+    let y = [];
+    let z = [];
+    for (let i=0;i<16;i++){
+        x.push(data[3*i]/150);
+        y.push(data[3*i+1]/150);
+        z.push(data[3*i+2]/150);
+    }
+
+    
+    //POSITION
+    let x1 = bicubic(u,v,x);
+    let y1 = bicubic(u,v,y);
+    let z1 = bicubic(u,v,z);
+    
+    //FACE MORMAL
+    let de = 0.01;
+    let v1 = [bicubic(u+de,v,x), bicubic(u+de,v,y), bicubic(u+de,v,z)];
+    let v2 = [bicubic(u,v+de,x), bicubic(u,v+de,y), bicubic(u,v+de,z)];
+    let N = cross(v1, v2);
+    
+    //VERTEX NORMAL
+    
+    
+  
+    return [x1, y1, z1, N[0], N[1], N[2], u, v];
+
+}
+
+// CREATE A PARAMETRIC SHAPE AS A SINGLE TRIANGLE STRIP
+
+function createBicubic(func, data, nu, nv) {
+    let vertices = [];
+    for (let j = 0 ; j < nv ; j++) {
+        let v0 =  j    / nv;
+        let v1 = (j+1) / nv;
+        for (let i = 0 ; i <= nu ; i++) {
+            let u = i / nu;
+            if (j % 2)
+            u = 1 - u;
+            vertices = vertices.concat(func(data, u, v0));
+            vertices = vertices.concat(func(data, u, v1));
+        }
+    }
+    return vertices;
+}
+
+
+var matrixValues = [];
+var stackPointer = 0;
+
+matrixValues[0] =  [
+                    1,0,0,0,
+                    0,1,0,0,
+                    0,0,1,0,
+                    0,0,0,1,];
+
+
+function multiplyMatrixAndPoint(matrix, point) {
+    
+    //Give a simple variable name to each part of the matrix, a column and row number
+    var c0r0 = matrix[ 0], c1r0 = matrix[ 1], c2r0 = matrix[ 2], c3r0 = matrix[ 3];
+    var c0r1 = matrix[ 4], c1r1 = matrix[ 5], c2r1 = matrix[ 6], c3r1 = matrix[ 7];
+    var c0r2 = matrix[ 8], c1r2 = matrix[ 9], c2r2 = matrix[10], c3r2 = matrix[11];
+    var c0r3 = matrix[12], c1r3 = matrix[13], c2r3 = matrix[14], c3r3 = matrix[15];
+    
+    //Now set some simple names for the point
+    var x = point[0];
+    var y = point[1];
+    var z = point[2];
+    var w = point[3];
+    
+    //Multiply the point against each part of the 1st column, then add together
+    var resultX = (x * c0r0) + (y * c0r1) + (z * c0r2) + (w * c0r3);
+    
+    //Multiply the point against each part of the 2nd column, then add together
+    var resultY = (x * c1r0) + (y * c1r1) + (z * c1r2) + (w * c1r3);
+    
+    //Multiply the point against each part of the 3rd column, then add together
+    var resultZ = (x * c2r0) + (y * c2r1) + (z * c2r2) + (w * c2r3);
+    
+    //Multiply the point against each part of the 4th column, then add together
+    var resultW = (x * c3r0) + (y * c3r1) + (z * c3r2) + (w * c3r3);
+    
+    return [resultX, resultY, resultZ, resultW];
+}
+
+//DONT KNOW WHY THIS ONE DOESNOT WORK!
+function multiplyMatrices(matrixA, matrixB) {
+    
+    // Slice the second matrix up into columns
+    var column0 = [matrixB[0], matrixB[4], matrixB[8], matrixB[12]];
+    var column1 = [matrixB[1], matrixB[5], matrixB[9], matrixB[13]];
+    var column2 = [matrixB[2], matrixB[6], matrixB[10], matrixB[14]];
+    var column3 = [matrixB[3], matrixB[7], matrixB[11], matrixB[15]];
+    
+    // Multiply each column by the matrix
+    var result0 = multiplyMatrixAndPoint(matrixA, column0);
+    var result1 = multiplyMatrixAndPoint(matrixA, column1);
+    var result2 = multiplyMatrixAndPoint(matrixA, column2);
+    var result3 = multiplyMatrixAndPoint(matrixA, column3);
+    
+    // Turn the result columns back into a single matrix
+    return [
+            result0[0], result1[0], result2[0], result3[0],
+            result0[1], result1[1], result2[1], result3[1],
+            result0[2], result1[2], result2[2], result3[2],
+            result0[3], result1[3], result2[3], result3[3]
+            ];
+}
+
+function matrixsMultiply(x, y){
+	var result = [0,0,0,0,
+                  0,0,0,0,
+                  0,0,0,0,
+                  0,0,0,0,];
+
+	for (let i=0; i<4; i++){
+		for (let j=0; j<4; j++){
+			for (let m=0; m<4; m++){
+				result[i*4+j]+=x[i*4+m]*y[m*4+j];
+			}
+		}
+	}
+	return result;
+}
+
+
+function multiplyPointAndPoint(pointA, pointB){
+    return pointA[0] * pointB[0] + pointA[1] * pointB[1] +
+           pointA[2] * pointB[2] + pointA[3] * pointB[3];
+}
+
+
+function translate(x,y,z){
+    let objMat = [
+                  1,   0,  0,  x,
+                  0,   1,  0,  y,
+                  0,   0,  1,  z,
+                  0,   0,  0,  1,];
+    matrixValues[stackPointer] = multiplyMatrices(objMat,matrixValues[stackPointer]);
+}
+
+function rotateX(x){
+    
+    let objMat = [
+               1,             0,            0,  0,
+               0,   Math.cos(x), -Math.sin(x),  0,
+               0,   Math.sin(x),  Math.cos(x),  0,
+               0,             0,            0,  1,];
+    matrixValues[stackPointer] = multiplyMatrices(objMat,matrixValues[stackPointer]);
+}
+
+
+function rotateY(x){
+    let objMat = [
+                Math.cos(x),   0,  Math.sin(x),  0,
+                          0,   1,            0,  0,
+               -Math.sin(x),   0,  Math.cos(x),  0,
+                          0,   0,            0,  1,];
+    matrixValues[stackPointer] = multiplyMatrices(objMat,matrixValues[stackPointer]);
+}
+
+function rotateZ(x){
+    let objMat = [
+                  Math.cos(x),   -Math.sin(x),  0,  0,
+                  Math.sin(x),    Math.cos(x),  0,  0,
+                            0,              0,  1,  0,
+                            0,              0,  0,  1,];
+    matrixValues[stackPointer] = multiplyMatrices(objMat,matrixValues[stackPointer]);
+}
+
+function scale(x,y,z){
+    let objMat = [
+                  x,   0,  0,  0,
+                  0,   y,  0,  0,
+                  0,   0,  z,  0,
+                  0,   0,  0,  1,];
+    matrixValues[stackPointer] = multiplyMatrices(objMat,matrixValues[stackPointer]);
+}
+
+
+function save(){
+    matrixValues.push(matrixValues[stackPointer]);
+    stackPointer++;
+}
+
+function restore(){
+    matrixValues.pop();
+    stackPointer--;
+}
+
+//CUBIC SPLINES
+
+function hermite_matrix(p0, p1, r0, r1){
+    var result = [];
+    result = multiplyMatrixAndPoint([ 2,-2, 1, 1,
+                                     -3, 3,-2,-1,
+                                      0, 0, 1, 0,
+                                      1, 0, 0, 0,], [p0,p1,r0,r1]);
+    return result;
+}
+
+function hermite_x(t){
+    var result = 0;
+    let hermite = hermite_matrix(.8,2,1,2.5);
+    result = hermite[0]*t*t*t +
+             hermite[1]*t*t +
+             hermite[2]*t +
+             hermite[3];
+    return result;
+}
+
+function hermite_y(t){
+    var result = 0;
+    let hermite = hermite_matrix(.8,1.3,1,.1);
+    result = hermite[0]*t*t*t +
+             hermite[1]*t*t +
+             hermite[2]*t +
+             hermite[3];
+    return result;
+}
+
+
+//BICUBIC
+
+
+
+function bicubic(u,v,c){
+    var m = [-1, 3,-3, 1,
+              3,-6, 3, 0,
+             -3, 3, 0, 0,
+              1, 0, 0, 0,];
+    var result = multiplyPointAndPoint(multiplyMatrixAndPoint(matrixsMultiply(matrixsMultiply(m,c),m),[v*v*v, v*v, v, 1]),[u*u*u, u*u, u, 1]);
+    return result;
+}
+
+
+
+function draw_bezier(data){
+    
+    var NewTriangleStrip = createBicubic(BezierVertex, data, 8, 8);
+    
+    setBuffer(gl, NewTriangleStrip);
+    
+    let objMat1 = matrixValues[stackPointer];
+    let norMat1 = matrixInvert(objMat1);
+    
+    setUniform('Matrix4fv', 'uObjectMat', false, objMat1);
+    setUniform('Matrix4fv', 'uNormalMat', false, norMat1);
+    setUniform('3fv', 'uRGB', [.6,.6,0.2]);
+    drawBuffer(gl);
+}
+
+
+// GENERATE THE TRIANGLE STRIP FOR A SPHERE
+
+
+function animate(gl) {
+   let time = (Date.now() - startTime) / 1000;
+
+   setUniform('1f', 'uTime', time);
+   setUniform('3fv', 'uCursor', cursor);
+
+   var zRange = 10; // DEFINE A RANGE FOR Z VALUES
+   var fl = 3;      // FOCAL LENGTH OF VIRTUAL CAMERA
+
+   // DEFINE THE PERSPECTIVE PROJECTION MATRIX
+
+   setUniform('Matrix4fv', 'uPPMat', false, [
+          1,  0,         0,     0,
+          0,  1,         0,     0,
+          0,  0, -1/zRange, -1/fl,
+          0,  0,         0,     1,
+   ]);
+
+   let c = Math.cos(1.3 * time);
+   let s = Math.sin(1.3 * time);
+
+   
+   let teapot_data = [[ // 0
+                     -80.00,   0.00,  30.00,  -80.00, -44.80,  30.00,  -44.80, -80.00,  30.00,    0.00, -80.00,  30.00,
+                     -80.00,   0.00,  12.00,  -80.00, -44.80,  12.00,  -44.80, -80.00,  12.00,    0.00, -80.00,  12.00,
+                     -60.00,   0.00,   3.00,  -60.00, -33.60,   3.00,  -33.60, -60.00,   3.00,    0.00, -60.00,   3.00,
+                     -60.00,   0.00,   0.00,  -60.00, -33.60,   0.00,  -33.60, -60.00,   0.00,    0.00, -60.00,   0.00,
+                    ],[
+                      0.00, -80.00,  30.00,   44.80, -80.00,  30.00,   80.00, -44.80,  30.00,   80.00,   0.00,  30.00,
+                      0.00, -80.00,  12.00,   44.80, -80.00,  12.00,   80.00, -44.80,  12.00,   80.00,   0.00,  12.00,
+                      0.00, -60.00,   3.00,   33.60, -60.00,   3.00,   60.00, -33.60,   3.00,   60.00,   0.00,   3.00,
+                      0.00, -60.00,   0.00,   33.60, -60.00,   0.00,   60.00, -33.60,   0.00,   60.00,   0.00,   0.00,
+                    ],[
+                     -60.00,   0.00,  90.00,  -60.00, -33.60,  90.00,  -33.60, -60.00,  90.00,    0.00, -60.00,  90.00,
+                     -70.00,   0.00,  69.00,  -70.00, -39.20,  69.00,  -39.20, -70.00,  69.00,    0.00, -70.00,  69.00,
+                     -80.00,   0.00,  48.00,  -80.00, -44.80,  48.00,  -44.80, -80.00,  48.00,    0.00, -80.00,  48.00,
+                     -80.00,   0.00,  30.00,  -80.00, -44.80,  30.00,  -44.80, -80.00,  30.00,    0.00, -80.00,  30.00,
+                    ],[
+                      0.00, -60.00,  90.00,   33.60, -60.00,  90.00,   60.00, -33.60,  90.00,   60.00,   0.00,  90.00,
+                      0.00, -70.00,  69.00,   39.20, -70.00,  69.00,   70.00, -39.20,  69.00,   70.00,   0.00,  69.00,
+                      0.00, -80.00,  48.00,   44.80, -80.00,  48.00,   80.00, -44.80,  48.00,   80.00,   0.00,  48.00,
+                      0.00, -80.00,  30.00,   44.80, -80.00,  30.00,   80.00, -44.80,  30.00,   80.00,   0.00,  30.00,
+                    ],[
+                     -56.00,   0.00,  90.00,  -56.00, -31.36,  90.00,  -31.36, -56.00,  90.00,    0.00, -56.00,  90.00,
+                     -53.50,   0.00,  95.25,  -53.50, -29.96,  95.25,  -29.96, -53.50,  95.25,    0.00, -53.50,  95.25,
+                     -57.50,   0.00,  95.25,  -57.50, -32.20,  95.25,  -32.20, -57.50,  95.25,    0.00, -57.50,  95.25,
+                     -60.00,   0.00,  90.00,  -60.00, -33.60,  90.00,  -33.60, -60.00,  90.00,    0.00, -60.00,  90.00,
+                    ],[ // 5
+                      0.00, -56.00,  90.00,   31.36, -56.00,  90.00,   56.00, -31.36,  90.00,   56.00,   0.00,  90.00,
+                      0.00, -53.50,  95.25,   29.96, -53.50,  95.25,   53.50, -29.96,  95.25,   53.50,   0.00,  95.25,
+                      0.00, -57.50,  95.25,   32.20, -57.50,  95.25,   57.50, -32.20,  95.25,   57.50,   0.00,  95.25,
+                      0.00, -60.00,  90.00,   33.60, -60.00,  90.00,   60.00, -33.60,  90.00,   60.00,   0.00,  90.00,
+                    ],[
+                     80.00,   0.00,  30.00,   80.00,  44.80,  30.00,   44.80,  80.00,  30.00,    0.00,  80.00,  30.00,
+                     80.00,   0.00,  12.00,   80.00,  44.80,  12.00,   44.80,  80.00,  12.00,    0.00,  80.00,  12.00,
+                     60.00,   0.00,   3.00,   60.00,  33.60,   3.00,   33.60,  60.00,   3.00,    0.00,  60.00,   3.00,
+                     60.00,   0.00,   0.00,   60.00,  33.60,   0.00,   33.60,  60.00,   0.00,    0.00,  60.00,   0.00,
+                    ],[
+                      0.00,  80.00,  30.00,  -44.80,  80.00,  30.00,  -80.00,  44.80,  30.00,  -80.00,   0.00,  30.00,
+                      0.00,  80.00,  12.00,  -44.80,  80.00,  12.00,  -80.00,  44.80,  12.00,  -80.00,   0.00,  12.00,
+                      0.00,  60.00,   3.00,  -33.60,  60.00,   3.00,  -60.00,  33.60,   3.00,  -60.00,   0.00,   3.00,
+                      0.00,  60.00,   0.00,  -33.60,  60.00,   0.00,  -60.00,  33.60,   0.00,  -60.00,   0.00,   0.00,
+                    ],[
+                     60.00,   0.00,  90.00,   60.00,  33.60,  90.00,   33.60,  60.00,  90.00,    0.00,  60.00,  90.00,
+                     70.00,   0.00,  69.00,   70.00,  39.20,  69.00,   39.20,  70.00,  69.00,    0.00,  70.00,  69.00,
+                     80.00,   0.00,  48.00,   80.00,  44.80,  48.00,   44.80,  80.00,  48.00,    0.00,  80.00,  48.00,
+                     80.00,   0.00,  30.00,   80.00,  44.80,  30.00,   44.80,  80.00,  30.00,    0.00,  80.00,  30.00,
+                    ],[
+                      0.00,  60.00,  90.00,  -33.60,  60.00,  90.00,  -60.00,  33.60,  90.00,  -60.00,   0.00,  90.00,
+                      0.00,  70.00,  69.00,  -39.20,  70.00,  69.00,  -70.00,  39.20,  69.00,  -70.00,   0.00,  69.00,
+                      0.00,  80.00,  48.00,  -44.80,  80.00,  48.00,  -80.00,  44.80,  48.00,  -80.00,   0.00,  48.00,
+                      0.00,  80.00,  30.00,  -44.80,  80.00,  30.00,  -80.00,  44.80,  30.00,  -80.00,   0.00,  30.00,
+                    ],[ // 10
+                     56.00,   0.00,  90.00,   56.00,  31.36,  90.00,   31.36,  56.00,  90.00,    0.00,  56.00,  90.00,
+                     53.50,   0.00,  95.25,   53.50,  29.96,  95.25,   29.96,  53.50,  95.25,    0.00,  53.50,  95.25,
+                     57.50,   0.00,  95.25,   57.50,  32.20,  95.25,   32.20,  57.50,  95.25,    0.00,  57.50,  95.25,
+                     60.00,   0.00,  90.00,   60.00,  33.60,  90.00,   33.60,  60.00,  90.00,    0.00,  60.00,  90.00,
+                    ],[
+                      0.00,  56.00,  90.00,  -31.36,  56.00,  90.00,  -56.00,  31.36,  90.00,  -56.00,   0.00,  90.00,
+                      0.00,  53.50,  95.25,  -29.96,  53.50,  95.25,  -53.50,  29.96,  95.25,  -53.50,   0.00,  95.25,
+                      0.00,  57.50,  95.25,  -32.20,  57.50,  95.25,  -57.50,  32.20,  95.25,  -57.50,   0.00,  95.25,
+                      0.00,  60.00,  90.00,  -33.60,  60.00,  90.00,  -60.00,  33.60,  90.00,  -60.00,   0.00,  90.00,
+                    ],[
+                     -64.00,   0.00,  75.00,  -64.00,  12.00,  75.00,  -60.00,  12.00,  84.00,  -60.00,   0.00,  84.00,
+                     -92.00,   0.00,  75.00,  -92.00,  12.00,  75.00, -100.00,  12.00,  84.00, -100.00,   0.00,  84.00,
+                     -108.00,   0.00,  75.00, -108.00,  12.00,  75.00, -120.00,  12.00,  84.00, -120.00,   0.00,  84.00,
+                     -108.00,   0.00,  66.00, -108.00,  12.00,  66.00, -120.00,  12.00,  66.00, -120.00,   0.00,  66.00,
+                    ],[
+                     -60.00,   0.00,  84.00,  -60.00, -12.00,  84.00,  -64.00, -12.00,  75.00,  -64.00,   0.00,  75.00,
+                     -100.00,   0.00,  84.00, -100.00, -12.00,  84.00,  -92.00, -12.00,  75.00,  -92.00,   0.00,  75.00,
+                     -120.00,   0.00,  84.00, -120.00, -12.00,  84.00, -108.00, -12.00,  75.00, -108.00,   0.00,  75.00,
+                     -120.00,   0.00,  66.00, -120.00, -12.00,  66.00, -108.00, -12.00,  66.00, -108.00,   0.00,  66.00,
+                    ],[
+                     -108.00,   0.00,  66.00, -108.00,  12.00,  66.00, -120.00,  12.00,  66.00, -120.00,   0.00,  66.00,
+                     -108.00,   0.00,  57.00, -108.00,  12.00,  57.00, -120.00,  12.00,  48.00, -120.00,   0.00,  48.00,
+                     -100.00,   0.00,  39.00, -100.00,  12.00,  39.00, -106.00,  12.00,  31.50, -106.00,   0.00,  31.50,
+                     -80.00,   0.00,  30.00,  -80.00,  12.00,  30.00,  -76.00,  12.00,  18.00,  -76.00,   0.00,  18.00,
+                    ],[ // 15
+                     -120.00,   0.00,  66.00, -120.00, -12.00,  66.00, -108.00, -12.00,  66.00, -108.00,   0.00,  66.00,
+                     -120.00,   0.00,  48.00, -120.00, -12.00,  48.00, -108.00, -12.00,  57.00, -108.00,   0.00,  57.00,
+                     -106.00,   0.00,  31.50, -106.00, -12.00,  31.50, -100.00, -12.00,  39.00, -100.00,   0.00,  39.00,
+                     -76.00,   0.00,  18.00,  -76.00, -12.00,  18.00,  -80.00, -12.00,  30.00,  -80.00,   0.00,  30.00,
+                    ],[
+                     68.00,   0.00,  51.00,   68.00,  26.40,  51.00,   68.00,  26.40,  18.00,   68.00,   0.00,  18.00,
+                     104.00,   0.00,  51.00,  104.00,  26.40,  51.00,  124.00,  26.40,  27.00,  124.00,   0.00,  27.00,
+                     92.00,   0.00,  78.00,   92.00,  10.00,  78.00,   96.00,  10.00,  75.00,   96.00,   0.00,  75.00,
+                     108.00,   0.00,  90.00,  108.00,  10.00,  90.00,  132.00,  10.00,  90.00,  132.00,   0.00,  90.00,
+                    ],[
+                     68.00,   0.00,  18.00,   68.00, -26.40,  18.00,   68.00, -26.40,  51.00,   68.00,   0.00,  51.00,
+                     124.00,   0.00,  27.00,  124.00, -26.40,  27.00,  104.00, -26.40,  51.00,  104.00,   0.00,  51.00,
+                     96.00,   0.00,  75.00,   96.00, -10.00,  75.00,   92.00, -10.00,  78.00,   92.00,   0.00,  78.00,
+                     132.00,   0.00,  90.00,  132.00, -10.00,  90.00,  108.00, -10.00,  90.00,  108.00,   0.00,  90.00,
+                    ],[
+                     108.00,   0.00,  90.00,  108.00,  10.00,  90.00,  132.00,  10.00,  90.00,  132.00,   0.00,  90.00,
+                     112.00,   0.00,  93.00,  112.00,  10.00,  93.00,  141.00,  10.00,  93.75,  141.00,   0.00,  93.75,
+                     116.00,   0.00,  93.00,  116.00,   6.00,  93.00,  138.00,   6.00,  94.50,  138.00,   0.00,  94.50,
+                     112.00,   0.00,  90.00,  112.00,   6.00,  90.00,  128.00,   6.00,  90.00,  128.00,   0.00,  90.00,
+                    ],[
+                     132.00,   0.00,  90.00,  132.00, -10.00,  90.00,  108.00, -10.00,  90.00,  108.00,   0.00,  90.00,
+                     141.00,   0.00,  93.75,  141.00, -10.00,  93.75,  112.00, -10.00,  93.00,  112.00,   0.00,  93.00,
+                     138.00,   0.00,  94.50,  138.00,  -6.00,  94.50,  116.00,  -6.00,  93.00,  116.00,   0.00,  93.00,
+                     128.00,   0.00,  90.00,  128.00,  -6.00,  90.00,  112.00,  -6.00,  90.00,  112.00,   0.00,  90.00,
+                    ],[ // 20
+                     50.00,   0.00,  90.00,   50.00,  28.00,  90.00,   28.00,  50.00,  90.00,    0.00,  50.00,  90.00,
+                     52.00,   0.00,  90.00,   52.00,  29.12,  90.00,   29.12,  52.00,  90.00,    0.00,  52.00,  90.00,
+                     54.00,   0.00,  90.00,   54.00,  30.24,  90.00,   30.24,  54.00,  90.00,    0.00,  54.00,  90.00,
+                     56.00,   0.00,  90.00,   56.00,  31.36,  90.00,   31.36,  56.00,  90.00,    0.00,  56.00,  90.00,
+                    ],[
+                      0.00,  50.00,  90.00,  -28.00,  50.00,  90.00,  -50.00,  28.00,  90.00,  -50.00,   0.00,  90.00,
+                      0.00,  52.00,  90.00,  -29.12,  52.00,  90.00,  -52.00,  29.12,  90.00,  -52.00,   0.00,  90.00,
+                      0.00,  54.00,  90.00,  -30.24,  54.00,  90.00,  -54.00,  30.24,  90.00,  -54.00,   0.00,  90.00,
+                      0.00,  56.00,  90.00,  -31.36,  56.00,  90.00,  -56.00,  31.36,  90.00,  -56.00,   0.00,  90.00,
+                    ],[
+                     -50.00,   0.00,  90.00,  -50.00, -28.00,  90.00,  -28.00, -50.00,  90.00,    0.00, -50.00,  90.00,
+                     -52.00,   0.00,  90.00,  -52.00, -29.12,  90.00,  -29.12, -52.00,  90.00,    0.00, -52.00,  90.00,
+                     -54.00,   0.00,  90.00,  -54.00, -30.24,  90.00,  -30.24, -54.00,  90.00,    0.00, -54.00,  90.00,
+                     -56.00,   0.00,  90.00,  -56.00, -31.36,  90.00,  -31.36, -56.00,  90.00,    0.00, -56.00,  90.00,
+                    ],[
+                      0.00, -50.00,  90.00,   28.00, -50.00,  90.00,   50.00, -28.00,  90.00,   50.00,   0.00,  90.00,
+                      0.00, -52.00,  90.00,   29.12, -52.00,  90.00,   52.00, -29.12,  90.00,   52.00,   0.00,  90.00,
+                      0.00, -54.00,  90.00,   30.24, -54.00,  90.00,   54.00, -30.24,  90.00,   54.00,   0.00,  90.00,
+                      0.00, -56.00,  90.00,   31.36, -56.00,  90.00,   56.00, -31.36,  90.00,   56.00,   0.00,  90.00,
+                    ],[
+                      8.00,   0.00, 102.00,    8.00,   4.48, 102.00,    4.48,   8.00, 102.00,    0.00,   8.00, 102.00,
+                     16.00,   0.00,  96.00,   16.00,   8.96,  96.00,    8.96,  16.00,  96.00,    0.00,  16.00,  96.00,
+                     52.00,   0.00,  96.00,   52.00,  29.12,  96.00,   29.12,  52.00,  96.00,    0.00,  52.00,  96.00,
+                     52.00,   0.00,  90.00,   52.00,  29.12,  90.00,   29.12,  52.00,  90.00,    0.00,  52.00,  90.00,
+                    ],[ // 25
+                      0.00,   8.00, 102.00,   -4.48,   8.00, 102.00,   -8.00,   4.48, 102.00,   -8.00,   0.00, 102.00,
+                      0.00,  16.00,  96.00,   -8.96,  16.00,  96.00,  -16.00,   8.96,  96.00,  -16.00,   0.00,  96.00,
+                      0.00,  52.00,  96.00,  -29.12,  52.00,  96.00,  -52.00,  29.12,  96.00,  -52.00,   0.00,  96.00,
+                      0.00,  52.00,  90.00,  -29.12,  52.00,  90.00,  -52.00,  29.12,  90.00,  -52.00,   0.00,  90.00,
+                    ],[
+                     -8.00,   0.00, 102.00,   -8.00,  -4.48, 102.00,   -4.48,  -8.00, 102.00,    0.00,  -8.00, 102.00,
+                     -16.00,   0.00,  96.00,  -16.00,  -8.96,  96.00,   -8.96, -16.00,  96.00,    0.00, -16.00,  96.00,
+                     -52.00,   0.00,  96.00,  -52.00, -29.12,  96.00,  -29.12, -52.00,  96.00,    0.00, -52.00,  96.00,
+                     -52.00,   0.00,  90.00,  -52.00, -29.12,  90.00,  -29.12, -52.00,  90.00,    0.00, -52.00,  90.00,
+                    ],[
+                      0.00,  -8.00, 102.00,    4.48,  -8.00, 102.00,    8.00,  -4.48, 102.00,    8.00,   0.00, 102.00,
+                      0.00, -16.00,  96.00,    8.96, -16.00,  96.00,   16.00,  -8.96,  96.00,   16.00,   0.00,  96.00,
+                      0.00, -52.00,  96.00,   29.12, -52.00,  96.00,   52.00, -29.12,  96.00,   52.00,   0.00,  96.00,
+                      0.00, -52.00,  90.00,   29.12, -52.00,  90.00,   52.00, -29.12,  90.00,   52.00,   0.00,  90.00,
+                    ],[
+                      0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,
+                     32.00,   0.00, 120.00,   32.00,  18.00, 120.00,   18.00,  32.00, 120.00,    0.00,  32.00, 120.00,
+                      0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,
+                      8.00,   0.00, 102.00,    8.00,   4.48, 102.00,    4.48,   8.00, 102.00,    0.00,   8.00, 102.00,
+                    ],[
+                      0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,
+                      0.00,  32.00, 120.00,  -18.00,  32.00, 120.00,  -32.00,  18.00, 120.00,  -32.00,   0.00, 120.00,
+                      0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,
+                      0.00,   8.00, 102.00,   -4.48,   8.00, 102.00,   -8.00,   4.48, 102.00,   -8.00,   0.00, 102.00,
+                    ],[ // 30
+                      0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,
+                     -32.00,   0.00, 120.00,  -32.00, -18.00, 120.00,  -18.00, -32.00, 120.00,    0.00, -32.00, 120.00,
+                      0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,
+                     -8.00,   0.00, 102.00,   -8.00,  -4.48, 102.00,   -4.48,  -8.00, 102.00,    0.00,  -8.00, 102.00,
+                    ],[
+                      0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,    0.00,   0.00, 120.00,
+                      0.00, -32.00, 120.00,   18.00, -32.00, 120.00,   32.00, -18.00, 120.00,   32.00,   0.00, 120.00,
+                      0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,    0.00,   0.00, 108.00,
+                      0.00,  -8.00, 102.00,    4.48,  -8.00, 102.00,    8.00,  -4.48, 102.00,    8.00,   0.00, 102.00,
+                    ]
+                    ];
+   save();
+   rotateX(c-Math.PI/4);
+   
+   translate(hermite_x(c)/5,hermite_y(c)/5,0);
+   
+   for (let i=0;i<32;i++){
+       let data = teapot_data[i];
+       save();
+       draw_bezier(data);
+       restore();
+   }
+   rotateX(c);
+     
+   restore();
+   
+}
+
+gl_start(canvas1, vs, fs);
+</script>
+
